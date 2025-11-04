@@ -20,6 +20,10 @@ const createTransporter = () => {
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD
+    },
+    tls: {
+      // 允許自簽名證書（用於某些網絡環境）
+      rejectUnauthorized: false
     }
   });
 };
