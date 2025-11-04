@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail 郵件發送器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #ea4335 0%, #4285f4 50%, #34a853 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .header .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        label .required {
+            color: #ea4335;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4285f4;
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(66, 133, 244, 0.4);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert.success {
+            background: #d4edda;
+            border: 2px solid #34a853;
+            color: #155724;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            border: 2px solid #ea4335;
+            color: #721c24;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .footer a {
+            color: #4285f4;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📧</div>
+            <h1>Gmail 郵件發送器</h1>
+            <p>輕鬆發送電子郵件</p>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在發送郵件...</p>
+        </div>
+
+        <form id="emailForm">
+            <div class="form-group">
+                <label for="to">
+                    收件人 <span class="required">*</span>
+                </label>
+                <input
+                    type="email"
+                    id="to"
+                    name="to"
+                    placeholder="recipient@example.com"
+                    required
+                >
+                <div class="help-text">可以輸入多個郵箱地址，用逗號分隔</div>
+            </div>
+
+            <div class="form-group">
+                <label for="subject">
+                    郵件主旨 <span class="required">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="subject"
+                    name="subject"
+                    placeholder="輸入郵件主旨"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="text">
+                    郵件內容 <span class="required">*</span>
+                </label>
+                <textarea
+                    id="text"
+                    name="text"
+                    placeholder="輸入郵件內容..."
+                    required
+                ></textarea>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                發送郵件
+            </button>
+        </form>
+
+        <div class="footer">
+            <p>使用 Gmail SMTP 服務發送郵件</p>
+            <p><a href="/api/health" target="_blank">檢查服務狀態</a></p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('emailForm');
+        const alertBox = document.getElementById('alert');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // 隱藏之前的提示
+            alertBox.classList.remove('show');
+            loading.classList.add('show');
+            submitBtn.disabled = true;
+
+            // 收集表單數據
+            const formData = {
+                to: document.getElementById('to').value,
+                subject: document.getElementById('subject').value,
+                text: document.getElementById('text').value
+            };
+
+            try {
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                loading.classList.remove('show');
+                submitBtn.disabled = false;
+
+                if (data.success) {
+                    showAlert('success', '✅ ' + data.message);
+                    form.reset();
+                } else {
+                    showAlert('error', '❌ ' + data.error);
+                }
+            } catch (error) {
+                loading.classList.remove('show');
+                submitBtn.disabled = false;
+                showAlert('error', '❌ 發送失敗: ' + error.message);
+            }
+        });
+
+        function showAlert(type, message) {
+            alertBox.className = 'alert ' + type + ' show';
+            alertBox.textContent = message;
+
+            // 3秒後自動隱藏成功訊息
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertBox.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        // 頁面載入時檢查服務狀態
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                console.log('服務狀態:', data);
+            } catch (error) {
+                console.error('無法連接到服務器:', error);
+            }
+        });
+    </script>
+</body>
+</html>
