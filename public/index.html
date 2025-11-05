@@ -358,7 +358,15 @@
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>正在發送郵件...</p>
+            <p id="loadingText">正在發送郵件...</p>
+            <div id="progressBar" style="display: none; margin-top: 15px; width: 100%;">
+                <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden;">
+                    <div id="progressFill" style="background: linear-gradient(90deg, #4285f4, #34a853); height: 100%; width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600;">
+                    </div>
+                </div>
+                <div id="progressText" style="text-align: center; margin-top: 5px; font-size: 13px; color: #666;">
+                </div>
+            </div>
         </div>
 
         <form id="emailForm">
@@ -371,9 +379,33 @@
                     id="to"
                     name="to"
                     placeholder="recipient@example.com"
-                    required
                 >
-                <div class="help-text">可以輸入多個郵箱地址，用逗號分隔</div>
+                <div class="help-text">可以輸入多個郵箱地址，用逗號分隔，或使用下方批量功能</div>
+
+                <!-- 批量發送功能 -->
+                <div class="toolbar" style="margin-top: 10px;">
+                    <button type="button" id="loadEmailListBtn" title="載入郵件地址清單">
+                        📋 載入地址清單
+                    </button>
+                    <input type="file" id="emailListInput" accept=".csv,.txt" style="display: none;">
+                    <span style="color: #666; font-size: 12px; line-height: 32px;">
+                        支援 CSV 或 TXT 格式
+                    </span>
+                </div>
+
+                <!-- 地址列表顯示 -->
+                <div id="emailListSection" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-weight: 600; color: #555; font-size: 14px;">
+                            📬 批量發送清單 (<span id="emailCount">0</span> 個地址)
+                        </span>
+                        <button type="button" id="clearEmailListBtn" style="background: #ea4335; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            清除清單
+                        </button>
+                    </div>
+                    <div id="emailListDisplay" class="attachments-list" style="max-height: 150px; overflow-y: auto; font-size: 12px;">
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -461,8 +493,21 @@
         const attachmentsList = document.getElementById('attachmentsList');
         const attachmentWarning = document.getElementById('attachmentWarning');
 
-        // 存儲附件
+        // 批量發送相關
+        const loadEmailListBtn = document.getElementById('loadEmailListBtn');
+        const emailListInput = document.getElementById('emailListInput');
+        const emailListSection = document.getElementById('emailListSection');
+        const emailListDisplay = document.getElementById('emailListDisplay');
+        const emailCount = document.getElementById('emailCount');
+        const clearEmailListBtn = document.getElementById('clearEmailListBtn');
+        const loadingText = document.getElementById('loadingText');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        // 存儲附件和郵件地址
         let attachments = [];
+        let emailList = []; // 批量發送地址清單
         const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
 
         // ==================== 圖片功能 ====================
@@ -726,6 +771,108 @@
             return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
         }
 
+        // ==================== 批量發送功能 ====================
+
+        // 載入地址清單按鈕
+        loadEmailListBtn.addEventListener('click', () => {
+            emailListInput.click();
+        });
+
+        // 處理郵件地址清單檔案
+        emailListInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const content = event.target.result;
+                    parseEmailList(content, file.name);
+                    emailListInput.value = ''; // 清空
+                } catch (error) {
+                    showAlert('error', '❌ 讀取檔案失敗: ' + error.message);
+                }
+            };
+            reader.onerror = () => {
+                showAlert('error', '❌ 讀取檔案失敗');
+            };
+            reader.readAsText(file);
+        });
+
+        // 解析郵件地址清單
+        function parseEmailList(content, filename) {
+            const emails = [];
+            const lines = content.split(/\r?\n/);
+
+            // 判斷是 CSV 還是 TXT
+            const isCSV = filename.toLowerCase().endsWith('.csv');
+
+            lines.forEach((line, index) => {
+                line = line.trim();
+                if (!line) return; // 跳過空行
+
+                if (isCSV) {
+                    // CSV: 可能有逗號分隔的多個欄位，取第一個欄位作為郵件地址
+                    const parts = line.split(',');
+                    const email = parts[0].trim().replace(/['"]/g, ''); // 移除引號
+                    if (validateEmail(email)) {
+                        emails.push(email);
+                    }
+                } else {
+                    // TXT: 每行一個郵件地址，或逗號/分號分隔
+                    const addressList = line.split(/[,;]/);
+                    addressList.forEach(addr => {
+                        const email = addr.trim();
+                        if (validateEmail(email)) {
+                            emails.push(email);
+                        }
+                    });
+                }
+            });
+
+            if (emails.length === 0) {
+                showAlert('error', '❌ 檔案中沒有找到有效的郵件地址');
+                return;
+            }
+
+            // 去重
+            emailList = [...new Set(emails)];
+
+            updateEmailListDisplay();
+            showAlert('success', `✅ 成功載入 ${emailList.length} 個郵件地址`);
+        }
+
+        // 驗證郵件地址
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        // 更新地址列表顯示
+        function updateEmailListDisplay() {
+            if (emailList.length === 0) {
+                emailListSection.style.display = 'none';
+                return;
+            }
+
+            emailListSection.style.display = 'block';
+            emailCount.textContent = emailList.length;
+
+            // 顯示地址列表
+            emailListDisplay.innerHTML = emailList.map((email, index) =>
+                `<div style="padding: 5px 10px; background: white; margin-bottom: 4px; border-radius: 4px; border: 1px solid #e0e0e0;">
+                    ${index + 1}. ${email}
+                </div>`
+            ).join('');
+        }
+
+        // 清除地址清單
+        clearEmailListBtn.addEventListener('click', () => {
+            emailList = [];
+            updateEmailListDisplay();
+            showAlert('success', '✅ 已清除地址清單');
+        });
+
         // ==================== 表單提交 ====================
 
         form.addEventListener('submit', async (e) => {
@@ -752,7 +899,7 @@
                             reader.onload = () => {
                                 resolve({
                                     filename: file.name,
-                                    content: reader.result.split(',')[1], // 移除 data:xxx;base64, 前綴
+                                    content: reader.result.split(',')[1],
                                     contentType: file.type || 'application/octet-stream'
                                 });
                             };
@@ -762,43 +909,147 @@
                     })
                 );
 
-                // 收集表單數據
-                const formData = {
-                    to: document.getElementById('to').value,
-                    subject: document.getElementById('subject').value,
-                    html: editorContent,
-                    text: editor.innerText || editor.textContent,
-                    attachments: attachmentData
-                };
-
-                const response = await fetch('/api/send-email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-
-                const data = await response.json();
-
-                loading.classList.remove('show');
-                submitBtn.disabled = false;
-
-                if (data.success) {
-                    showAlert('success', '✅ ' + data.message);
-                    form.reset();
-                    editor.innerHTML = '';
-                    attachments = [];
-                    updateAttachmentsList();
+                // 判斷是批量發送還是單個發送
+                if (emailList.length > 0) {
+                    // 批量發送
+                    await sendBatchEmails(editorContent, attachmentData);
                 } else {
-                    showAlert('error', '❌ ' + data.error);
+                    // 單個發送
+                    const toValue = document.getElementById('to').value.trim();
+                    if (!toValue) {
+                        showAlert('error', '❌ 請輸入收件人或載入地址清單');
+                        loading.classList.remove('show');
+                        submitBtn.disabled = false;
+                        return;
+                    }
+                    await sendSingleEmail(toValue, editorContent, attachmentData);
                 }
+
             } catch (error) {
                 loading.classList.remove('show');
                 submitBtn.disabled = false;
+                progressBar.style.display = 'none';
                 showAlert('error', '❌ 發送失敗: ' + error.message);
             }
         });
+
+        // 單個郵件發送
+        async function sendSingleEmail(to, editorContent, attachmentData) {
+            const formData = {
+                to: to,
+                subject: document.getElementById('subject').value,
+                html: editorContent,
+                text: editor.innerText || editor.textContent,
+                attachments: attachmentData
+            };
+
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            loading.classList.remove('show');
+            submitBtn.disabled = false;
+
+            if (data.success) {
+                showAlert('success', '✅ ' + data.message);
+                form.reset();
+                editor.innerHTML = '';
+                attachments = [];
+                updateAttachmentsList();
+            } else {
+                showAlert('error', '❌ ' + data.error);
+            }
+        }
+
+        // 批量郵件發送
+        async function sendBatchEmails(editorContent, attachmentData) {
+            const total = emailList.length;
+            let successCount = 0;
+            let failCount = 0;
+            const failedEmails = [];
+
+            // 顯示進度條
+            progressBar.style.display = 'block';
+            loadingText.textContent = '正在批量發送郵件...';
+
+            for (let i = 0; i < total; i++) {
+                const email = emailList[i];
+                const progress = ((i / total) * 100).toFixed(0);
+
+                // 更新進度
+                progressFill.style.width = progress + '%';
+                progressFill.textContent = progress + '%';
+                progressText.textContent = `正在發送 ${i + 1} / ${total}: ${email}`;
+
+                try {
+                    const formData = {
+                        to: email,
+                        subject: document.getElementById('subject').value,
+                        html: editorContent,
+                        text: editor.innerText || editor.textContent,
+                        attachments: attachmentData
+                    };
+
+                    const response = await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        failedEmails.push({ email, error: data.error });
+                    }
+                } catch (error) {
+                    failCount++;
+                    failedEmails.push({ email, error: error.message });
+                }
+
+                // 添加延遲，避免發送太快被限制（每封間隔 1 秒）
+                if (i < total - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            // 完成
+            progressFill.style.width = '100%';
+            progressFill.textContent = '100%';
+            progressText.textContent = `完成！成功: ${successCount}, 失敗: ${failCount}`;
+
+            loading.classList.remove('show');
+            submitBtn.disabled = false;
+            progressBar.style.display = 'none';
+
+            // 顯示結果
+            let message = `✅ 批量發送完成！\n成功: ${successCount} 封\n失敗: ${failCount} 封`;
+            if (failedEmails.length > 0) {
+                message += '\n\n失敗的地址:\n' + failedEmails.map(f => `${f.email}: ${f.error}`).join('\n');
+            }
+
+            showAlert(failCount > 0 ? 'error' : 'success', message);
+
+            // 成功後清空表單
+            if (successCount > 0) {
+                form.reset();
+                editor.innerHTML = '';
+                attachments = [];
+                emailList = [];
+                updateAttachmentsList();
+                updateEmailListDisplay();
+            }
+        }
 
         function showAlert(type, message) {
             alertBox.className = 'alert ' + type + ' show';
