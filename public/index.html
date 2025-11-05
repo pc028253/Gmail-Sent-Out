@@ -23,7 +23,7 @@
 
         .container {
             width: 100%;
-            max-width: 700px;
+            max-width: 750px;
             background: white;
             border-radius: 16px;
             padding: 40px;
@@ -85,7 +85,7 @@
 
         .editor {
             width: 100%;
-            min-height: 200px;
+            min-height: 150px;
             padding: 12px 16px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
@@ -121,6 +121,7 @@
             padding: 10px;
             background: #f5f5f5;
             border-radius: 8px;
+            flex-wrap: wrap;
         }
 
         .toolbar button {
@@ -131,6 +132,7 @@
             cursor: pointer;
             font-size: 14px;
             transition: all 0.2s;
+            white-space: nowrap;
         }
 
         .toolbar button:hover {
@@ -141,6 +143,89 @@
 
         .toolbar input[type="file"] {
             display: none;
+        }
+
+        .attachments-section {
+            margin-top: 10px;
+        }
+
+        .attachments-list {
+            background: #f9f9f9;
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .attachments-list.empty {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s;
+        }
+
+        .attachment-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .attachment-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .attachment-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .attachment-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .attachment-size {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .attachment-remove {
+            background: #ea4335;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .attachment-remove:hover {
+            background: #c5221f;
         }
 
         .btn {
@@ -253,6 +338,12 @@
             color: #666;
             margin-top: 5px;
         }
+
+        .warning-text {
+            font-size: 12px;
+            color: #ea4335;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -260,7 +351,7 @@
         <div class="header">
             <div class="logo">📧</div>
             <h1>Gmail 郵件發送器</h1>
-            <p>輕鬆發送電子郵件（支援圖片）</p>
+            <p>輕鬆發送電子郵件（支援圖片 + 附件）</p>
         </div>
 
         <div id="alert" class="alert"></div>
@@ -303,10 +394,10 @@
                     郵件內容 <span class="required">*</span>
                 </label>
                 <div class="toolbar">
-                    <button type="button" id="uploadBtn" title="上傳圖片">
-                        📷 上傳圖片
+                    <button type="button" id="uploadImageBtn" title="上傳圖片到內容">
+                        📷 插入圖片
                     </button>
-                    <input type="file" id="fileInput" accept="image/*" multiple>
+                    <input type="file" id="imageInput" accept="image/*" multiple>
                     <span style="color: #666; font-size: 12px; line-height: 32px;">
                         或直接貼上/拖放圖片到內容區域
                     </span>
@@ -317,7 +408,29 @@
                     contenteditable="true"
                     data-placeholder="輸入郵件內容... 您可以貼上圖片或拖放圖片到這裡"
                 ></div>
-                <div class="help-text">支援貼上圖片（Ctrl+V）、拖放圖片，或點擊上方按鈕上傳圖片</div>
+                <div class="help-text">支援貼上圖片（Ctrl+V）、拖放圖片，或點擊上方按鈕插入圖片</div>
+            </div>
+
+            <div class="form-group">
+                <label for="attachments">
+                    📎 附件（選填）
+                </label>
+                <div class="toolbar">
+                    <button type="button" id="uploadAttachmentBtn" title="上傳附件">
+                        📎 添加附件
+                    </button>
+                    <input type="file" id="attachmentInput" multiple>
+                    <span style="color: #666; font-size: 12px; line-height: 32px;">
+                        支援所有檔案類型
+                    </span>
+                </div>
+                <div class="attachments-section">
+                    <div id="attachmentsList" class="attachments-list empty">
+                        尚未添加附件
+                    </div>
+                </div>
+                <div class="help-text">附件總大小不超過 25MB（Gmail 限制）</div>
+                <div class="warning-text" id="attachmentWarning" style="display: none;"></div>
             </div>
 
             <button type="submit" class="btn" id="submitBtn">
@@ -337,25 +450,39 @@
         const loading = document.getElementById('loading');
         const submitBtn = document.getElementById('submitBtn');
         const editor = document.getElementById('editor');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const fileInput = document.getElementById('fileInput');
+
+        // 圖片上傳相關
+        const uploadImageBtn = document.getElementById('uploadImageBtn');
+        const imageInput = document.getElementById('imageInput');
+
+        // 附件上傳相關
+        const uploadAttachmentBtn = document.getElementById('uploadAttachmentBtn');
+        const attachmentInput = document.getElementById('attachmentInput');
+        const attachmentsList = document.getElementById('attachmentsList');
+        const attachmentWarning = document.getElementById('attachmentWarning');
+
+        // 存儲附件
+        let attachments = [];
+        const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
+
+        // ==================== 圖片功能 ====================
 
         // 上傳圖片按鈕
-        uploadBtn.addEventListener('click', () => {
-            fileInput.click();
+        uploadImageBtn.addEventListener('click', () => {
+            imageInput.click();
         });
 
-        // 處理檔案選擇
-        fileInput.addEventListener('change', (e) => {
+        // 處理圖片檔案選擇
+        imageInput.addEventListener('change', (e) => {
             const files = e.target.files;
-            handleFiles(files);
+            handleImageFiles(files);
+            imageInput.value = ''; // 清空，允許重複選擇同一檔案
         });
 
-        // 處理貼上事件（改進版）
+        // 處理貼上事件
         editor.addEventListener('paste', (e) => {
             console.log('貼上事件觸發');
 
-            // 檢查剪貼板中是否有內容
             if (!e.clipboardData || !e.clipboardData.items) {
                 console.log('沒有剪貼板數據');
                 return;
@@ -402,11 +529,11 @@
             editor.classList.remove('dragover');
 
             const files = e.dataTransfer.files;
-            handleFiles(files);
+            handleImageFiles(files);
         });
 
-        // 處理多個檔案
-        function handleFiles(files) {
+        // 處理多個圖片檔案
+        function handleImageFiles(files) {
             for (let i = 0; i < files.length; i++) {
                 if (files[i].type.indexOf('image') !== -1) {
                     insertImage(files[i]);
@@ -438,7 +565,6 @@
                     img.style.padding = '5px';
                     img.style.margin = '10px 0';
 
-                    // 在編輯器中插入圖片
                     editor.focus();
 
                     const selection = window.getSelection();
@@ -447,7 +573,6 @@
                         range.deleteContents();
                         range.insertNode(img);
 
-                        // 在圖片後添加換行
                         const br = document.createElement('br');
                         range.collapse(false);
                         range.insertNode(br);
@@ -455,7 +580,6 @@
                         selection.removeAllRanges();
                         selection.addRange(range);
                     } else {
-                        // 如果沒有選區，直接添加到編輯器末尾
                         editor.appendChild(img);
                         editor.appendChild(document.createElement('br'));
                     }
@@ -475,7 +599,135 @@
             reader.readAsDataURL(file);
         }
 
-        // 表單提交
+        // ==================== 附件功能 ====================
+
+        // 上傳附件按鈕
+        uploadAttachmentBtn.addEventListener('click', () => {
+            attachmentInput.click();
+        });
+
+        // 處理附件選擇
+        attachmentInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            addAttachments(files);
+            attachmentInput.value = ''; // 清空
+        });
+
+        // 添加附件
+        function addAttachments(files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // 檢查是否已存在
+                if (attachments.some(att => att.name === file.name && att.size === file.size)) {
+                    showAlert('error', `❌ 附件 "${file.name}" 已存在`);
+                    continue;
+                }
+
+                // 檢查總大小
+                const totalSize = attachments.reduce((sum, att) => sum + att.size, 0) + file.size;
+                if (totalSize > MAX_TOTAL_SIZE) {
+                    showAlert('error', '❌ 附件總大小超過 25MB 限制');
+                    break;
+                }
+
+                attachments.push(file);
+            }
+
+            updateAttachmentsList();
+        }
+
+        // 更新附件列表顯示
+        function updateAttachmentsList() {
+            if (attachments.length === 0) {
+                attachmentsList.className = 'attachments-list empty';
+                attachmentsList.innerHTML = '尚未添加附件';
+                attachmentWarning.style.display = 'none';
+                return;
+            }
+
+            attachmentsList.className = 'attachments-list';
+            attachmentsList.innerHTML = '';
+
+            let totalSize = 0;
+
+            attachments.forEach((file, index) => {
+                totalSize += file.size;
+
+                const item = document.createElement('div');
+                item.className = 'attachment-item';
+
+                const icon = getFileIcon(file.name);
+
+                item.innerHTML = `
+                    <div class="attachment-info">
+                        <span class="attachment-icon">${icon}</span>
+                        <div class="attachment-details">
+                            <div class="attachment-name" title="${file.name}">${file.name}</div>
+                            <div class="attachment-size">${formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <button type="button" class="attachment-remove" data-index="${index}">
+                        🗑️ 移除
+                    </button>
+                `;
+
+                attachmentsList.appendChild(item);
+            });
+
+            // 添加移除按鈕事件
+            document.querySelectorAll('.attachment-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    removeAttachment(index);
+                });
+            });
+
+            // 顯示總大小警告
+            const percentage = (totalSize / MAX_TOTAL_SIZE * 100).toFixed(1);
+            if (totalSize > MAX_TOTAL_SIZE * 0.8) {
+                attachmentWarning.textContent = `⚠️ 附件總大小: ${formatFileSize(totalSize)} (${percentage}% / 100%)`;
+                attachmentWarning.style.display = 'block';
+            } else {
+                attachmentWarning.style.display = 'none';
+            }
+        }
+
+        // 移除附件
+        function removeAttachment(index) {
+            attachments.splice(index, 1);
+            updateAttachmentsList();
+        }
+
+        // 獲取檔案圖示
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                pdf: '📄',
+                doc: '📝', docx: '📝',
+                xls: '📊', xlsx: '📊',
+                ppt: '📊', pptx: '📊',
+                zip: '🗜️', rar: '🗜️', '7z': '🗜️',
+                jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', bmp: '🖼️',
+                mp4: '🎬', avi: '🎬', mov: '🎬',
+                mp3: '🎵', wav: '🎵',
+                txt: '📃',
+                html: '🌐', css: '🎨', js: '⚙️',
+            };
+            return icons[ext] || '📎';
+        }
+
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // ==================== 表單提交 ====================
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -491,15 +743,34 @@
             loading.classList.add('show');
             submitBtn.disabled = true;
 
-            // 收集表單數據
-            const formData = {
-                to: document.getElementById('to').value,
-                subject: document.getElementById('subject').value,
-                html: editorContent,
-                text: editor.innerText || editor.textContent
-            };
-
             try {
+                // 準備附件數據
+                const attachmentData = await Promise.all(
+                    attachments.map(file => {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                                resolve({
+                                    filename: file.name,
+                                    content: reader.result.split(',')[1], // 移除 data:xxx;base64, 前綴
+                                    contentType: file.type || 'application/octet-stream'
+                                });
+                            };
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                    })
+                );
+
+                // 收集表單數據
+                const formData = {
+                    to: document.getElementById('to').value,
+                    subject: document.getElementById('subject').value,
+                    html: editorContent,
+                    text: editor.innerText || editor.textContent,
+                    attachments: attachmentData
+                };
+
                 const response = await fetch('/api/send-email', {
                     method: 'POST',
                     headers: {
@@ -517,6 +788,8 @@
                     showAlert('success', '✅ ' + data.message);
                     form.reset();
                     editor.innerHTML = '';
+                    attachments = [];
+                    updateAttachmentsList();
                 } else {
                     showAlert('error', '❌ ' + data.error);
                 }
@@ -531,7 +804,6 @@
             alertBox.className = 'alert ' + type + ' show';
             alertBox.textContent = message;
 
-            // 5秒後自動隱藏成功訊息
             if (type === 'success') {
                 setTimeout(() => {
                     alertBox.classList.remove('show');
