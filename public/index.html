@@ -23,7 +23,7 @@
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 700px;
             background: white;
             border-radius: 16px;
             padding: 40px;
@@ -77,15 +77,70 @@
             transition: border-color 0.3s, box-shadow 0.3s;
         }
 
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, .editor:focus {
             outline: none;
             border-color: #4285f4;
             box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
         }
 
-        textarea {
-            min-height: 120px;
-            resize: vertical;
+        .editor {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .editor:empty:before {
+            content: attr(data-placeholder);
+            color: #999;
+        }
+
+        .editor img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: block;
+        }
+
+        .editor.dragover {
+            border-color: #4285f4;
+            background: rgba(66, 133, 244, 0.05);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .toolbar button {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .toolbar button:hover {
+            background: #4285f4;
+            color: white;
+            border-color: #4285f4;
+        }
+
+        .toolbar input[type="file"] {
+            display: none;
         }
 
         .btn {
@@ -205,7 +260,7 @@
         <div class="header">
             <div class="logo">📧</div>
             <h1>Gmail 郵件發送器</h1>
-            <p>輕鬆發送電子郵件</p>
+            <p>輕鬆發送電子郵件（支援圖片）</p>
         </div>
 
         <div id="alert" class="alert"></div>
@@ -244,15 +299,25 @@
             </div>
 
             <div class="form-group">
-                <label for="text">
+                <label for="editor">
                     郵件內容 <span class="required">*</span>
                 </label>
-                <textarea
-                    id="text"
-                    name="text"
-                    placeholder="輸入郵件內容..."
-                    required
-                ></textarea>
+                <div class="toolbar">
+                    <button type="button" id="uploadBtn" title="上傳圖片">
+                        📷 上傳圖片
+                    </button>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                    <span style="color: #666; font-size: 12px; line-height: 32px;">
+                        或直接貼上/拖放圖片到內容區域
+                    </span>
+                </div>
+                <div
+                    id="editor"
+                    class="editor"
+                    contenteditable="true"
+                    data-placeholder="輸入郵件內容... 您可以貼上圖片或拖放圖片到這裡"
+                ></div>
+                <div class="help-text">支援貼上圖片（Ctrl+V）、拖放圖片，或點擊上方按鈕上傳圖片</div>
             </div>
 
             <button type="submit" class="btn" id="submitBtn">
@@ -271,9 +336,100 @@
         const alertBox = document.getElementById('alert');
         const loading = document.getElementById('loading');
         const submitBtn = document.getElementById('submitBtn');
+        const editor = document.getElementById('editor');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
 
+        // 上傳圖片按鈕
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 處理檔案選擇
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            handleFiles(files);
+        });
+
+        // 處理貼上事件
+        editor.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    const file = items[i].getAsFile();
+                    insertImage(file);
+                }
+            }
+        });
+
+        // 處理拖放事件
+        editor.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            editor.classList.add('dragover');
+        });
+
+        editor.addEventListener('dragleave', () => {
+            editor.classList.remove('dragover');
+        });
+
+        editor.addEventListener('drop', (e) => {
+            e.preventDefault();
+            editor.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        // 處理多個檔案
+        function handleFiles(files) {
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].type.indexOf('image') !== -1) {
+                    insertImage(files[i]);
+                }
+            }
+        }
+
+        // 插入圖片到編輯器
+        function insertImage(file) {
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+
+                // 在編輯器中插入圖片
+                editor.focus();
+                const selection = window.getSelection();
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(img);
+
+                // 在圖片後添加換行
+                const br = document.createElement('br');
+                range.collapse(false);
+                range.insertNode(br);
+                range.setStartAfter(br);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        // 表單提交
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // 檢查編輯器是否有內容
+            const editorContent = editor.innerHTML.trim();
+            if (!editorContent || editorContent === '<br>') {
+                showAlert('error', '❌ 請輸入郵件內容');
+                return;
+            }
 
             // 隱藏之前的提示
             alertBox.classList.remove('show');
@@ -284,7 +440,8 @@
             const formData = {
                 to: document.getElementById('to').value,
                 subject: document.getElementById('subject').value,
-                text: document.getElementById('text').value
+                html: editorContent,
+                text: editor.innerText || editor.textContent
             };
 
             try {
@@ -304,6 +461,7 @@
                 if (data.success) {
                     showAlert('success', '✅ ' + data.message);
                     form.reset();
+                    editor.innerHTML = '';
                 } else {
                     showAlert('error', '❌ ' + data.error);
                 }
@@ -318,7 +476,7 @@
             alertBox.className = 'alert ' + type + ' show';
             alertBox.textContent = message;
 
-            // 3秒後自動隱藏成功訊息
+            // 5秒後自動隱藏成功訊息
             if (type === 'success') {
                 setTimeout(() => {
                     alertBox.classList.remove('show');
