@@ -351,16 +351,39 @@
             handleFiles(files);
         });
 
-        // 處理貼上事件
+        // 處理貼上事件（改進版）
         editor.addEventListener('paste', (e) => {
+            console.log('貼上事件觸發');
+
+            // 檢查剪貼板中是否有內容
+            if (!e.clipboardData || !e.clipboardData.items) {
+                console.log('沒有剪貼板數據');
+                return;
+            }
+
             const items = e.clipboardData.items;
+            console.log('剪貼板項目數量:', items.length);
+
+            let hasImage = false;
 
             for (let i = 0; i < items.length; i++) {
+                console.log('項目類型:', items[i].type);
+
                 if (items[i].type.indexOf('image') !== -1) {
+                    console.log('找到圖片！');
                     e.preventDefault();
+                    hasImage = true;
                     const file = items[i].getAsFile();
-                    insertImage(file);
+                    if (file) {
+                        insertImage(file);
+                    } else {
+                        console.error('無法獲取圖片檔案');
+                    }
                 }
+            }
+
+            if (!hasImage) {
+                console.log('剪貼板中沒有圖片，允許貼上文字');
             }
         });
 
@@ -393,28 +416,60 @@
 
         // 插入圖片到編輯器
         function insertImage(file) {
+            if (!file) {
+                console.error('沒有提供檔案');
+                showAlert('error', '❌ 無法讀取圖片');
+                return;
+            }
+
+            console.log('開始讀取圖片:', file.name, file.type, file.size);
+
             const reader = new FileReader();
 
             reader.onload = (e) => {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
+                try {
+                    console.log('圖片讀取成功');
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.maxWidth = '100%';
+                    img.style.height = 'auto';
+                    img.style.border = '1px solid #ddd';
+                    img.style.borderRadius = '4px';
+                    img.style.padding = '5px';
+                    img.style.margin = '10px 0';
 
-                // 在編輯器中插入圖片
-                editor.focus();
-                const selection = window.getSelection();
-                const range = selection.getRangeAt(0);
-                range.deleteContents();
-                range.insertNode(img);
+                    // 在編輯器中插入圖片
+                    editor.focus();
 
-                // 在圖片後添加換行
-                const br = document.createElement('br');
-                range.collapse(false);
-                range.insertNode(br);
-                range.setStartAfter(br);
-                selection.removeAllRanges();
-                selection.addRange(range);
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        range.deleteContents();
+                        range.insertNode(img);
+
+                        // 在圖片後添加換行
+                        const br = document.createElement('br');
+                        range.collapse(false);
+                        range.insertNode(br);
+                        range.setStartAfter(br);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    } else {
+                        // 如果沒有選區，直接添加到編輯器末尾
+                        editor.appendChild(img);
+                        editor.appendChild(document.createElement('br'));
+                    }
+
+                    console.log('圖片插入成功');
+                } catch (error) {
+                    console.error('插入圖片時出錯:', error);
+                    showAlert('error', '❌ 插入圖片失敗');
+                }
+            };
+
+            reader.onerror = (error) => {
+                console.error('讀取圖片失敗:', error);
+                showAlert('error', '❌ 讀取圖片失敗');
             };
 
             reader.readAsDataURL(file);
