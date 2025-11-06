@@ -1,4 +1,4 @@
-# Gmail Sent Out 📧
+# Avnet Ken 📧
 
 透過 Gmail SMTP 服務發送郵件的網頁應用程式
 
@@ -30,7 +30,7 @@ npm install
 
 1. 在安全性設定頁面，找到「應用程式密碼」
 2. 選擇「郵件」作為應用程式
-3. 選擇「其他」作為裝置，輸入「Gmail Sent Out」
+3. 選擇「其他」作為裝置，輸入「Avnet Ken」
 4. 點擊「產生」
 5. 複製顯示的 16 位密碼（格式：xxxx xxxx xxxx xxxx）
 
@@ -142,7 +142,7 @@ curl http://localhost:3000/api/health
 ## 📁 專案結構
 
 ```
-gmail-sent-out/
+avnet-ken/
 ├── src/
 │   └── server.js          # Express 伺服器
 ├── public/

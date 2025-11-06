@@ -1,7 +1,7 @@
 {
-  "name": "gmail-sent-out",
+  "name": "avnet-ken",
   "version": "1.0.0",
-  "description": "透過 Gmail 發送郵件的網頁應用程式",
+  "description": "Avnet Ken - 透過 Gmail 發送郵件的網頁應用程式",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

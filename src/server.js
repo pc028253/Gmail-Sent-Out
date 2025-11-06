@@ -63,7 +63,7 @@ app.post('/api/send-email', async (req, res) => {
 
     // 郵件選項
     const mailOptions = {
-      from: `"Gmail Sent Out" <${process.env.GMAIL_USER}>`,
+      from: `"Avnet Ken" <${process.env.GMAIL_USER}>`,
       to: to,
       subject: subject,
       text: text,
