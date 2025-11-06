@@ -409,6 +409,32 @@
             </div>
 
             <div class="form-group">
+                <label for="cc">
+                    副本 CC（選填）
+                </label>
+                <input
+                    type="text"
+                    id="cc"
+                    name="cc"
+                    placeholder="抄送收件人（多個地址用逗號分隔）"
+                >
+                <div class="help-text">副本收件人可以看到彼此的郵件地址</div>
+            </div>
+
+            <div class="form-group">
+                <label for="bcc">
+                    密件副本 BCC（選填）
+                </label>
+                <input
+                    type="text"
+                    id="bcc"
+                    name="bcc"
+                    placeholder="密件副本收件人（多個地址用逗號分隔）"
+                >
+                <div class="help-text">密件副本收件人無法看到彼此的郵件地址</div>
+            </div>
+
+            <div class="form-group">
                 <label for="subject">
                     郵件主旨 <span class="required">*</span>
                 </label>
@@ -937,6 +963,8 @@
         async function sendSingleEmail(to, editorContent, attachmentData) {
             const formData = {
                 to: to,
+                cc: document.getElementById('cc').value.trim() || undefined,
+                bcc: document.getElementById('bcc').value.trim() || undefined,
                 subject: document.getElementById('subject').value,
                 html: editorContent,
                 text: editor.innerText || editor.textContent,
@@ -990,6 +1018,8 @@
                 try {
                     const formData = {
                         to: email,
+                        cc: document.getElementById('cc').value.trim() || undefined,
+                        bcc: document.getElementById('bcc').value.trim() || undefined,
                         subject: document.getElementById('subject').value,
                         html: editorContent,
                         text: editor.innerText || editor.textContent,

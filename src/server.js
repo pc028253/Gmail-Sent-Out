@@ -40,7 +40,7 @@ app.get('/api/health', (req, res) => {
 
 // 發送郵件 API
 app.post('/api/send-email', async (req, res) => {
-  const { to, subject, text, html, attachments } = req.body;
+  const { to, cc, bcc, subject, text, html, attachments } = req.body;
 
   // 驗證必填欄位
   if (!to || !subject || (!text && !html)) {
@@ -69,6 +69,14 @@ app.post('/api/send-email', async (req, res) => {
       text: text,
       html: html || text.replace(/\n/g, '<br>')
     };
+
+    // 添加副本和密件副本（如果有提供）
+    if (cc) {
+      mailOptions.cc = cc;
+    }
+    if (bcc) {
+      mailOptions.bcc = bcc;
+    }
 
     // 處理附件
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
